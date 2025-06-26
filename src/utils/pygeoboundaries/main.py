@@ -126,11 +126,6 @@ def _get_full_adm_data(iso3: str, adm_level: str, simplified: bool) -> dict:
     try:
         # Get metadata for the entire ADM level
         metadata = get_metadata(iso3, adm_level)
-        print(f"\n=== METADATA FOR {iso3} {adm_level} ===")
-        for key, value in metadata.items():
-            print(f"{key}: {value}")
-        print("=== END METADATA ===\n")
-
         json_uri = metadata[geom_complexity]
         session = session_manager.get_session()
         response = session.get(json_uri)
@@ -146,41 +141,6 @@ def _filter_features_by_adm_codes(
 ) -> dict:
     """Filter GeoJSON features to only include specific ADM codes."""
     filtered_features = []
-
-    # Debug: Show sample of available properties
-    print("\n=== DEBUGGING ADM CODES ===")
-    print(f"Looking for ADM codes: {adm_codes}")
-    print(f"Total features in data: {len(feature_collection['features'])}")
-
-    # Show first few features' properties
-    for i, feature in enumerate(feature_collection["features"][:5]):
-        print(f"\nFeature {i + 1} properties:")
-        if "properties" in feature:
-            for key, value in feature["properties"].items():
-                print(f"  {key}: {value}")
-        else:
-            print("  No properties found")
-
-    # Check if any features have properties that might contain our codes
-    print("\n=== SEARCHING FOR MATCHING CODES ===")
-    found_codes = set()
-    for i, feature in enumerate(feature_collection["features"]):
-        if "properties" in feature:
-            for key, value in feature["properties"].items():
-                # Try to convert to int and check if it matches any of our codes
-                try:
-                    if isinstance(value, str) and value.isdigit():
-                        int_value = int(value)
-                        if int_value in adm_codes:
-                            print(
-                                f"Found code {int_value} in feature {i + 1}, property '{key}': {value}"
-                            )
-                            found_codes.add(int_value)
-                except (ValueError, TypeError):
-                    continue
-
-    print(f"Found codes: {sorted(list(found_codes))}")
-    print(f"Missing codes: {sorted(list(set(adm_codes) - found_codes))}")
 
     for feature in feature_collection["features"]:
         # Extract ADM code from feature properties
@@ -209,11 +169,8 @@ def _filter_features_by_adm_codes(
                 adm_code = int(adm_code)
                 if adm_code in adm_codes:
                     filtered_features.append(feature)
-                    print(f"Found matching ADM code: {adm_code}")
         except (ValueError, TypeError):
             continue
-
-    print("=== END DEBUGGING ===\n")
 
     return {"type": "FeatureCollection", "features": filtered_features}
 
@@ -321,18 +278,6 @@ def _filter_features_by_names(
     """Filter GeoJSON features to only include specific administrative unit names."""
     filtered_features = []
 
-    print("\n=== SEARCHING BY NAMES ===")
-    print(f"Looking for units: {unit_names}")
-    print(f"Total features in data: {len(feature_collection['features'])}")
-
-    # Get all available names for debugging
-    available_names = []
-    for feature in feature_collection["features"]:
-        if "properties" in feature and "shapeName" in feature["properties"]:
-            available_names.append(feature["properties"]["shapeName"])
-
-    print(f"Sample of available names: {available_names[:10]}")
-
     for feature in feature_collection["features"]:
         if "properties" in feature and "shapeName" in feature["properties"]:
             feature_name = feature["properties"]["shapeName"]
@@ -340,17 +285,12 @@ def _filter_features_by_names(
             # Try exact match first
             if feature_name in unit_names:
                 filtered_features.append(feature)
-                print(f"Exact match found: {feature_name}")
                 continue
 
             # Try case-insensitive match
             if feature_name.lower() in [name.lower() for name in unit_names]:
                 filtered_features.append(feature)
-                print(f"Case-insensitive match found: {feature_name}")
                 continue
-
-    print(f"Found {len(filtered_features)} matching features")
-    print("=== END NAME SEARCH ===\n")
 
     return {"type": "FeatureCollection", "features": filtered_features}
 
@@ -359,12 +299,7 @@ def get_adm_by_names(
     iso3: str, unit_names: List[str], adm_level: str, simplified=True
 ) -> dict:
     """Get GeoJSON data for multiple administrative units by name."""
-    print(f"Fetching full {adm_level} data for {iso3}...")
     full_data = _get_full_adm_data(iso3, adm_level, simplified)
-
-    print(
-        f"Filtering {len(full_data['features'])} features for {len(unit_names)} unit names..."
-    )
     filtered_data = _filter_features_by_names(full_data, unit_names, adm_level)
 
     if not filtered_data["features"]:
@@ -372,7 +307,6 @@ def get_adm_by_names(
             f"No matching administrative units found for {iso3} at level {adm_level}"
         )
 
-    print(f"Found {len(filtered_data['features'])} matching features")
     return filtered_data
 
 
