@@ -1,0 +1,34 @@
+repos:
+  # Python hooks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.0
+    hooks:
+      # Run the linter.
+      - id: ruff
+        name: Ruff (linter)
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+        name: Ruff (formatter)
+  - repo: local
+    hooks:
+      # Radon MI and Halstead checks
+      - id: radon-check
+        name: Radon maintainability and Halstead checks
+        entry: |
+          bash -c 'for file in "$@"; do 
+            echo "Checking $file"; 
+            radon mi -s "$file" | grep -E " - [CDEF] \(" && echo "Radon MI grade below B detected in $file!" && exit 1; 
+            radon hal "$file" -s | awk -v filename="$file" "/effort/ { if (\$3 > 2000) print filename \": High Halstead effort:\" \$3 }"; 
+          done; 
+          echo "All MI grades are B or above."'
+        language: system
+        files: \.py$
+        pass_filenames: true
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: 'v2.3'
+    hooks:
+      - id: vulture
+        name: Vulture (dead code detection)
+        args: [--min-confidence, '80']
