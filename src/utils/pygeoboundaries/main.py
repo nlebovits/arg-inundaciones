@@ -101,17 +101,21 @@ def _generate_url(territory: str, adm: Union[str, int]) -> str:
     return f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/{adm}/"
 
 
-def get_adm_by_codes(iso3: str, adm_codes: List[int], adm_level: str, simplified=True) -> dict:
+def get_adm_by_codes(
+    iso3: str, adm_codes: List[int], adm_level: str, simplified=True
+) -> dict:
     """Get GeoJSON data for multiple ADM codes by filtering the full ADM level data."""
     print(f"Fetching full {adm_level} data for {iso3}...")
     full_data = _get_full_adm_data(iso3, adm_level, simplified)
-    
-    print(f"Filtering {len(full_data['features'])} features for {len(adm_codes)} ADM codes...")
+
+    print(
+        f"Filtering {len(full_data['features'])} features for {len(adm_codes)} ADM codes..."
+    )
     filtered_data = _filter_features_by_adm_codes(full_data, adm_codes, adm_level)
-    
+
     if not filtered_data["features"]:
         raise ValueError(f"No matching ADM codes found for {iso3} at level {adm_level}")
-    
+
     print(f"Found {len(filtered_data['features'])} matching features")
     return filtered_data
 
@@ -125,8 +129,8 @@ def _get_full_adm_data(iso3: str, adm_level: str, simplified: bool) -> dict:
         print(f"\n=== METADATA FOR {iso3} {adm_level} ===")
         for key, value in metadata.items():
             print(f"{key}: {value}")
-        print(f"=== END METADATA ===\n")
-        
+        print("=== END METADATA ===\n")
+
         json_uri = metadata[geom_complexity]
         session = session_manager.get_session()
         response = session.get(json_uri)
@@ -137,26 +141,28 @@ def _get_full_adm_data(iso3: str, adm_level: str, simplified: bool) -> dict:
         raise
 
 
-def _filter_features_by_adm_codes(feature_collection: dict, adm_codes: List[int], adm_level: str) -> dict:
+def _filter_features_by_adm_codes(
+    feature_collection: dict, adm_codes: List[int], adm_level: str
+) -> dict:
     """Filter GeoJSON features to only include specific ADM codes."""
     filtered_features = []
-    
+
     # Debug: Show sample of available properties
-    print(f"\n=== DEBUGGING ADM CODES ===")
+    print("\n=== DEBUGGING ADM CODES ===")
     print(f"Looking for ADM codes: {adm_codes}")
     print(f"Total features in data: {len(feature_collection['features'])}")
-    
+
     # Show first few features' properties
     for i, feature in enumerate(feature_collection["features"][:5]):
-        print(f"\nFeature {i+1} properties:")
+        print(f"\nFeature {i + 1} properties:")
         if "properties" in feature:
             for key, value in feature["properties"].items():
                 print(f"  {key}: {value}")
         else:
             print("  No properties found")
-    
+
     # Check if any features have properties that might contain our codes
-    print(f"\n=== SEARCHING FOR MATCHING CODES ===")
+    print("\n=== SEARCHING FOR MATCHING CODES ===")
     found_codes = set()
     for i, feature in enumerate(feature_collection["features"]):
         if "properties" in feature:
@@ -166,35 +172,37 @@ def _filter_features_by_adm_codes(feature_collection: dict, adm_codes: List[int]
                     if isinstance(value, str) and value.isdigit():
                         int_value = int(value)
                         if int_value in adm_codes:
-                            print(f"Found code {int_value} in feature {i+1}, property '{key}': {value}")
+                            print(
+                                f"Found code {int_value} in feature {i + 1}, property '{key}': {value}"
+                            )
                             found_codes.add(int_value)
                 except (ValueError, TypeError):
                     continue
-    
+
     print(f"Found codes: {sorted(list(found_codes))}")
     print(f"Missing codes: {sorted(list(set(adm_codes) - found_codes))}")
-    
+
     for feature in feature_collection["features"]:
         # Extract ADM code from feature properties
         # The property name might vary, so we'll try common patterns
         adm_code = None
-        
+
         # Try different possible property names for ADM codes
         possible_props = [
-            f"shapeID",  # Common in geoBoundaries
-            f"shapeid", 
+            "shapeID",  # Common in geoBoundaries
+            "shapeid",
             f"adm{adm_level[-1]}code",  # e.g., adm2code
             f"adm{adm_level[-1]}_code",
-            f"code",
-            f"id"
+            "code",
+            "id",
         ]
-        
+
         if "properties" in feature:
             for prop in possible_props:
                 if prop in feature["properties"]:
                     adm_code = feature["properties"][prop]
                     break
-        
+
         # Convert to int for comparison
         try:
             if adm_code is not None:
@@ -204,13 +212,10 @@ def _filter_features_by_adm_codes(feature_collection: dict, adm_codes: List[int]
                     print(f"Found matching ADM code: {adm_code}")
         except (ValueError, TypeError):
             continue
-    
-    print(f"=== END DEBUGGING ===\n")
-    
-    return {
-        "type": "FeatureCollection",
-        "features": filtered_features
-    }
+
+    print("=== END DEBUGGING ===\n")
+
+    return {"type": "FeatureCollection", "features": filtered_features}
 
 
 def get_metadata(territory: str, adm: Union[str, int]) -> dict:
@@ -255,12 +260,12 @@ def get_adm(
 
 def _calculate_bounding_box(feature_collection):
     """Calculate bounding box from GeoJSON FeatureCollection."""
-    min_lat, max_lat = float('inf'), float('-inf')
-    min_lon, max_lon = float('inf'), float('-inf')
-    
+    min_lat, max_lat = float("inf"), float("-inf")
+    min_lon, max_lon = float("inf"), float("-inf")
+
     for feature in feature_collection["features"]:
         geometry = feature["geometry"]
-        
+
         if geometry["type"] == "Polygon":
             coords = geometry["coordinates"][0]  # First ring of polygon
         elif geometry["type"] == "MultiPolygon":
@@ -269,19 +274,19 @@ def _calculate_bounding_box(feature_collection):
                 coords.extend(polygon[0])  # First ring of each polygon
         else:
             continue
-            
+
         for coord in coords:
             lon, lat = coord
             min_lat = min(min_lat, lat)
             max_lat = max(max_lat, lat)
             min_lon = min(min_lon, lon)
             max_lon = max(max_lon, lon)
-    
+
     return {
         "min_lat": min_lat,
         "max_lat": max_lat,
         "min_lon": min_lon,
-        "max_lon": max_lon
+        "max_lon": max_lon,
     }
 
 
@@ -292,15 +297,17 @@ def get_area_of_interest(place_name, adm="ADM0"):
     return _calculate_bounding_box(geojson_data)
 
 
-def get_area_of_interest_by_codes(adm_codes: List[int], adm_level: str, country_iso3: str, simplified=True):
+def get_area_of_interest_by_codes(
+    adm_codes: List[int], adm_level: str, country_iso3: str, simplified=True
+):
     """Retrieve the area of interest based on ADM codes.
-    
+
     Args:
         adm_codes: List of ADM codes (e.g., [4386, 4395, 4445])
         adm_level: ADM level (e.g., 'ADM1', 'ADM2')
         country_iso3: ISO3 country code (e.g., 'ARG' for Argentina)
         simplified: Whether to use simplified geometry (default: True)
-    
+
     Returns:
         Dictionary with bounding box coordinates: {min_lat, max_lat, min_lon, max_lon}
     """
@@ -308,71 +315,78 @@ def get_area_of_interest_by_codes(adm_codes: List[int], adm_level: str, country_
     return _calculate_bounding_box(geojson_data)
 
 
-def _filter_features_by_names(feature_collection: dict, unit_names: List[str], adm_level: str) -> dict:
+def _filter_features_by_names(
+    feature_collection: dict, unit_names: List[str], adm_level: str
+) -> dict:
     """Filter GeoJSON features to only include specific administrative unit names."""
     filtered_features = []
-    
-    print(f"\n=== SEARCHING BY NAMES ===")
+
+    print("\n=== SEARCHING BY NAMES ===")
     print(f"Looking for units: {unit_names}")
     print(f"Total features in data: {len(feature_collection['features'])}")
-    
+
     # Get all available names for debugging
     available_names = []
     for feature in feature_collection["features"]:
         if "properties" in feature and "shapeName" in feature["properties"]:
             available_names.append(feature["properties"]["shapeName"])
-    
+
     print(f"Sample of available names: {available_names[:10]}")
-    
+
     for feature in feature_collection["features"]:
         if "properties" in feature and "shapeName" in feature["properties"]:
             feature_name = feature["properties"]["shapeName"]
-            
+
             # Try exact match first
             if feature_name in unit_names:
                 filtered_features.append(feature)
                 print(f"Exact match found: {feature_name}")
                 continue
-            
+
             # Try case-insensitive match
             if feature_name.lower() in [name.lower() for name in unit_names]:
                 filtered_features.append(feature)
                 print(f"Case-insensitive match found: {feature_name}")
                 continue
-    
+
     print(f"Found {len(filtered_features)} matching features")
-    print(f"=== END NAME SEARCH ===\n")
-    
-    return {
-        "type": "FeatureCollection",
-        "features": filtered_features
-    }
+    print("=== END NAME SEARCH ===\n")
+
+    return {"type": "FeatureCollection", "features": filtered_features}
 
 
-def get_adm_by_names(iso3: str, unit_names: List[str], adm_level: str, simplified=True) -> dict:
+def get_adm_by_names(
+    iso3: str, unit_names: List[str], adm_level: str, simplified=True
+) -> dict:
     """Get GeoJSON data for multiple administrative units by name."""
     print(f"Fetching full {adm_level} data for {iso3}...")
     full_data = _get_full_adm_data(iso3, adm_level, simplified)
-    
-    print(f"Filtering {len(full_data['features'])} features for {len(unit_names)} unit names...")
+
+    print(
+        f"Filtering {len(full_data['features'])} features for {len(unit_names)} unit names..."
+    )
     filtered_data = _filter_features_by_names(full_data, unit_names, adm_level)
-    
+
     if not filtered_data["features"]:
-        raise ValueError(f"No matching administrative units found for {iso3} at level {adm_level}")
-    
+        raise ValueError(
+            f"No matching administrative units found for {iso3} at level {adm_level}"
+        )
+
     print(f"Found {len(filtered_data['features'])} matching features")
     return filtered_data
 
 
-def get_area_of_interest_by_names(unit_names: List[str], adm_level: str, country_iso3: str, simplified=True):
+def get_area_of_interest_by_names(
+    unit_names: List[str], adm_level: str, country_iso3: str, simplified=True
+):
     """Retrieve the area of interest based on administrative unit names.
-    
+
     Args:
         unit_names: List of administrative unit names (e.g., ['La Plata', 'Buenos Aires'])
         adm_level: ADM level (e.g., 'ADM1', 'ADM2')
         country_iso3: ISO3 country code (e.g., 'ARG' for Argentina)
         simplified: Whether to use simplified geometry (default: True)
-    
+
     Returns:
         Dictionary with bounding box coordinates: {min_lat, max_lat, min_lon, max_lon}
     """
@@ -380,31 +394,33 @@ def get_area_of_interest_by_names(unit_names: List[str], adm_level: str, country
     return _calculate_bounding_box(geojson_data)
 
 
-def list_available_units(country_iso3: str, adm_level: str, simplified=True, max_units=50):
+def list_available_units(
+    country_iso3: str, adm_level: str, simplified=True, max_units=50
+):
     """List all available administrative unit names in a dataset.
-    
+
     Args:
         country_iso3: ISO3 country code (e.g., 'ARG' for Argentina)
         adm_level: ADM level (e.g., 'ADM1', 'ADM2')
         simplified: Whether to use simplified geometry (default: True)
         max_units: Maximum number of units to display (default: 50)
-    
+
     Returns:
         List of available unit names
     """
     print(f"Fetching {adm_level} data for {country_iso3}...")
     full_data = _get_full_adm_data(country_iso3, adm_level, simplified)
-    
+
     unit_names = []
     for feature in full_data["features"]:
         if "properties" in feature and "shapeName" in feature["properties"]:
             unit_names.append(feature["properties"]["shapeName"])
-    
+
     unit_names.sort()  # Sort alphabetically
-    
+
     print(f"\n=== AVAILABLE {adm_level} UNITS FOR {country_iso3} ===")
     print(f"Total units: {len(unit_names)}")
-    
+
     if len(unit_names) <= max_units:
         for i, name in enumerate(unit_names, 1):
             print(f"{i:3d}. {name}")
@@ -413,7 +429,7 @@ def list_available_units(country_iso3: str, adm_level: str, simplified=True, max
         for i, name in enumerate(unit_names[:max_units], 1):
             print(f"{i:3d}. {name}")
         print(f"... and {len(unit_names) - max_units} more")
-    
-    print(f"=== END LIST ===\n")
-    
+
+    print("=== END LIST ===\n")
+
     return unit_names
